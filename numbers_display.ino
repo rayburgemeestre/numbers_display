@@ -71,11 +71,40 @@ bool colons = false;
 
 // time stuff
 #include <ESP8266WiFi.h>
-#include <time.h>
 const char* ssid = "NETGEAR805GX";//"Pfff alweer vertraging";
 const char* password = "slowbolt948";
-int timezone = 3;
-int dst = 0;
+
+
+#include <time.h>                       // time() ctime()
+#include <sys/time.h>                   // struct timeval
+#include <coredecls.h>                  // settimeofday_cb()
+#define TZ              0       // (utc+) TZ in hours
+#define DST_MN          60      // use 60mn for summer time in some countries
+#define TZ_MN           ((TZ)*60)
+#define TZ_SEC          ((TZ)*3600)
+#define DST_SEC         ((DST_MN)*60)
+timeval cbtime;      // time set in callback
+bool cbtime_set = false;
+void time_is_set (void)
+{
+  gettimeofday(&cbtime, NULL);
+  cbtime_set = true;
+}
+timeval tv;
+timespec tp;
+time_t now;
+uint32_t now_ms, now_us;
+
+
+
+extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
+
+void printTm (const char* what, const tm* tm) {
+  Serial.print(what);
+  Serial.print(tm->tm_hour);
+  Serial.print(tm->tm_min);
+  Serial.print(tm->tm_sec);\
+}
 
 //D1
 //int LED_SCK[] = { D0 , D3 , D5 , D7 , D11 , D14 };
@@ -88,8 +117,31 @@ int dst = 0;
 int LED_SCK[] = { D7 , D7,  D7,  D7,  D7,  D7 };
 int LED_SDA[] = { D1 , D2 , D3 , D4 , D5 , D6 };
 
+void update_time()
+{
+    gettimeofday(&tv, nullptr);
+    clock_gettime(0, &tp);
+    now = time(nullptr);
+
+    //printTm("localtime", localtime(&now));
+    //printTm("gmtime   ", gmtime(&now));
+
+    struct tm *tmp = localtime(&now);
+
+    if (tmp->tm_hour != hour || tmp->tm_min != minute) {
+       hour = tmp->tm_hour;
+       minute = tmp->tm_min;
+       second = tmp->tm_sec;
+    }
+}
+
+int lcd_initialized = -1;
+SSD1306 *display = NULL;
 
 void setup() {
+   lcd_initialized = 10;
+   display = NULL;
+
   // D1
 /*  
     //GPIO 1 (TX) swap the pin to a GPIO.
@@ -129,8 +181,13 @@ void setup() {
     while (WiFi.status() != WL_CONNECTED) {
         delay(1000);
     }
-    configTime(2 * 3600, 0, "pool.ntp.org", "time.nist.gov");
-    Serial.println(time(nullptr));
+
+   lcd_initialized = 10;
+   lcd_initialized = 10;
+
+    settimeofday_cb(time_is_set);
+    configTime(TZ_SEC, DST_SEC, "pool.ntp.org", "time.nist.gov");
+    
     // some issue with the client version I am using, see
     // https://github.com/stelgenhof/NTPClient/issues/5
     while (time(nullptr) < 30000) {
@@ -138,21 +195,14 @@ void setup() {
         delay(1000);
     }
 
-    time_t t = time(nullptr);
-    struct tm *now = localtime(&t);
-    Serial.println("OK:");
-    //Serial.println(now);
-    //Serial.println(ctime(&now));
-    hour = now->tm_hour;
-    minute = now->tm_min;
-    second = now->tm_sec;
+    update_time();
 
     Serial.println(hour);
     Serial.println(minute);
     Serial.println(second);
-    
 
     ms = millis();
+    Serial.print("WTF:"); Serial.println(lcd_initialized);
 }
 #endif
 
@@ -265,11 +315,9 @@ void clear(int lcd_index) {
     animate_fill(lcd_index, false);
 }
 
-int lcd_initialized = -1;
-SSD1306 *display = NULL;
 void do_it(int lcd_index, unsigned char *character, unsigned char *prev, int duration) {
     if (lcd_initialized != lcd_index) {
-        if (lcd_initialized != -1) {
+        if (lcd_initialized != 10) {
             display->end();
             delete(display);
         }
@@ -277,28 +325,39 @@ void do_it(int lcd_index, unsigned char *character, unsigned char *prev, int dur
         display = new SSD1306(0x3c, LED_SDA[lcd_index], LED_SCK[lcd_index]);
         display->init();
     }
-    //SSD1306  display(0x3c, LED_SDA[lcd_index], LED_SCK[lcd_index]);
-    //display.init();
-    //display.setContrast(255);
-    //display.clear();
-    //display.display();
-    if (duration != 0)
-        fade_out(*display, prev, duration);
+    if (duration != 0) {
+      fade_out(*display, prev, duration);
+    }
     fade_in(*display, character, duration);
-    //display.end();
 }
 
-unsigned char *previous_character = characters[0];
-unsigned char *previous_character_minute = characters[0];
+//unsigned char *previous_character = characters[0];
+//unsigned char *previous_character_minute = characters[0];
 
 bool first = true;
 
 void loop() {
+   /*Serial.print("WTFLOOP:"); Serial.println(lcd_initialized);
+
+    Serial.print(hour);
+    Serial.print(":");
+    Serial.print(minute);
+    Serial.print(":");
+    Serial.println(second);
+    */
+  
     int now = millis();
+
+    /*
+    Serial.print(now);
+    Serial.print(" - ");
+    Serial.print(ms);
+    Serial.println("");
+     */
 
     int duration = num_screens == 6 ? 10 : 20;
     int digits_changed = 0;
-    unsigned char *character = characters[second];
+   // unsigned char *character = characters[second];
 
     if (now - ms> 1000) {
         ms += 1000;
@@ -350,7 +409,6 @@ void loop() {
         if (first) digits_changed = 6;
 
         duration -= digits_changed; // otherwise the total animation will take too long
-
         // do the changes
         if (num_screens == 6) {
             if (s2 != S_digit_2 || first){
@@ -362,7 +420,6 @@ void loop() {
                 do_it(4, characters[s1], characters[S_digit_1], duration);
             }
         }
-
         if (m2 != M_digit_2 || first){
             // d7
             colons = num_screens == 6;
@@ -409,8 +466,4 @@ void loop() {
        do_it(D12, D11, character, previous_character, duration);
        do_it(D4, D6, character, previous_character, duration);
      */
-    //second++;
-    previous_character = character;
-
 }
-
