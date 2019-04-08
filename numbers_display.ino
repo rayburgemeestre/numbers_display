@@ -1,7 +1,5 @@
 #include <Wire.h>
 
-
-#include <Wire.h>  // Only needed for Arduino 1.6.5 and earlier
 #include "SSD1306.h" // alias for `#include "SSD1306Wire.h"`
 // Initialize the OLED display using Wire library
 //SSD1306  display(0x3c, D3, D5);
@@ -49,42 +47,34 @@ unsigned char *characters [] = {
 
 bool colons = false;
 
-// time stuff
+
 #include <ESP8266WiFi.h>
 const char* ssid = "NETGEAR805GX";//"Pfff alweer vertraging";
 const char* password = "slowbolt948";
 
 
+
 #include <time.h>                       // time() ctime()
 #include <sys/time.h>                   // struct timeval
 #include <coredecls.h>                  // settimeofday_cb()
-#define TZ              0       // (utc+) TZ in hours
+#define TZ              1       // (utc+) TZ in hours
 #define DST_MN          60      // use 60mn for summer time in some countries
 #define TZ_MN           ((TZ)*60)
 #define TZ_SEC          ((TZ)*3600)
 #define DST_SEC         ((DST_MN)*60)
 timeval cbtime;      // time set in callback
 bool cbtime_set = false;
-void time_is_set (void)
-{
+void time_is_set(void) {
   gettimeofday(&cbtime, NULL);
   cbtime_set = true;
+  Serial.println("------------------ settimeofday() was called ------------------");
 }
 timeval tv;
 timespec tp;
 time_t now;
-uint32_t now_ms, now_us;
-
-
-
 extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
 
-void printTm (const char* what, const tm* tm) {
-  Serial.print(what);
-  Serial.print(tm->tm_hour);
-  Serial.print(tm->tm_min);
-  Serial.print(tm->tm_sec);\
-}
+
 
 //D1
 //int LED_SCK[] = { D0 , D3 , D5 , D7 , D11 , D14 };
@@ -141,6 +131,11 @@ void setup() {
         do_it(i, characters[1], characters[1], duration);
     }
 
+  // BEGIN TIME SETUP
+  settimeofday_cb(time_is_set);
+  configTime(TZ_SEC, DST_SEC, "pool.ntp.org");
+  // END TIME SETUP
+
     Serial.begin(115200);
     Serial.setDebugOutput(true);
 
@@ -152,22 +147,6 @@ void setup() {
 
    lcd_initialized = 10;
    lcd_initialized = 10;
-
-    settimeofday_cb(time_is_set);
-    configTime(TZ_SEC, DST_SEC, "pool.ntp.org", "time.nist.gov");
-    
-    // some issue with the client version I am using, see
-    // https://github.com/stelgenhof/NTPClient/issues/5
-    while (time(nullptr) < 30000) {
-        Serial.println(time(nullptr));
-        delay(1000);
-    }
-
-    update_time();
-
-    Serial.println(hour);
-    Serial.println(minute);
-    Serial.println(second);
 
     ms = millis();
 }
@@ -287,10 +266,19 @@ void do_it(int lcd_index, unsigned char *character, unsigned char *prev, int dur
 bool first = true;
 
 void loop() {
-    Serial.println("RBU");
+  gettimeofday(&tv, nullptr);
+  clock_gettime(0, &tp);
+  now = time(nullptr);
+
+  const tm* tm = gmtime(&now);
+  hour = tm ->tm_hour;
+  minute = tm ->tm_min;
+  second = tm ->tm_sec;
+  
+/*    Serial.println("RBU");
     Serial.println(hour);
     Serial.println(minute);
-    Serial.println(second);
+    Serial.println(second);*/
     
     int now = millis();
 
