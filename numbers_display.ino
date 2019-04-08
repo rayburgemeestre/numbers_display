@@ -14,8 +14,8 @@
 /**
  * WiFi Network settings
  */
-const char* ssid = "NETGEAR805GX";
-const char* password = "slowbolt948";
+const char* ssid = "********";
+const char* password = "********";
 
 /**
  * Number of screens available.
