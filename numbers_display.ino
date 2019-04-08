@@ -1,25 +1,5 @@
 #include <Wire.h>
 
-#ifdef ARDUINO_AND_NOT_ESPDUINO
-#include <Adafruit_SSD1306.h>
-#include <Adafruit_GFX.h>
-
-// OLED display TWI address
-#define OLED_ADDR   0x3C
-
-Adafruit_SSD1306 display(-1);
-
-#if (SSD1306_LCDHEIGHT != 64)
-#error("Height incorrect, please fix Adafruit_SSD1306.h!");
-#endif
-
-void setup() {
-  // initialize and clear display
-  display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
-  display.clearDisplay();
-  display.display();
-}
-#else
 
 #include <Wire.h>  // Only needed for Arduino 1.6.5 and earlier
 #include "SSD1306.h" // alias for `#include "SSD1306Wire.h"`
@@ -142,18 +122,6 @@ void setup() {
    lcd_initialized = 10;
    display = NULL;
 
-  // D1
-/*  
-    //GPIO 1 (TX) swap the pin to a GPIO.
-    //GPIO 3 (RX) swap the pin to a GPIO.
-    pinMode(D0, FUNCTION_3);
-    pinMode(D1, FUNCTION_3);
-    // Swap some more pins
-    pinMode(D14, FUNCTION_3);
-    pinMode(D15, FUNCTION_3);
-    pinMode(D11, FUNCTION_3);
-    pinMode(D12, FUNCTION_3);
-  */
    // D1 mini (Lite), use all the pins!
    for (int i=0; i<num_screens; i++) {
     pinMode(LED_SCK[i], FUNCTION_3);
@@ -202,9 +170,7 @@ void setup() {
     Serial.println(second);
 
     ms = millis();
-    Serial.print("WTF:"); Serial.println(lcd_initialized);
 }
-#endif
 
 double radius = 0.0;
 void show_display(SSD1306 &display, unsigned char *character, int shift) {
@@ -248,20 +214,8 @@ void show_display(SSD1306 &display, unsigned char *character, int shift) {
     for (int x=0; x<127; x++) {
         for (int y=0; y<64; y++) {
 
-#ifdef ARDUINO_AND_NOT_ESPDUINO
-            display.drawPixel(
-                    x,
-                    63 - y,
-                    pixel && (colons || y < 64-16) && (y % shift == 0 && x % shift == 0) && (/*scanline*/y%shift == 0) ? WHITE : BLACK
-                    );
-#else
             display.setColor(pixel && (colons || y < 64-16) && (y % shift == 0 && x % shift == 0) && (/*scanline*/y%2 == 0)? WHITE : BLACK);
             display.setPixel(127 - x, y);
-
-            // display2.setColor(pixel && (colons || y < 64-16) && (y % shift == 0 && x % shift == 0) ? WHITE : BLACK);
-            // display2.setPixel(127 - x, y);
-#endif
-
 
             num--;
             while (num == 0) {
@@ -272,7 +226,6 @@ void show_display(SSD1306 &display, unsigned char *character, int shift) {
         }
     }
     display.display();
-    //display2.display();
 }
 
 void fade_in(SSD1306 &display, unsigned char *character, int duration) {
@@ -331,33 +284,18 @@ void do_it(int lcd_index, unsigned char *character, unsigned char *prev, int dur
     fade_in(*display, character, duration);
 }
 
-//unsigned char *previous_character = characters[0];
-//unsigned char *previous_character_minute = characters[0];
-
 bool first = true;
 
 void loop() {
-   /*Serial.print("WTFLOOP:"); Serial.println(lcd_initialized);
-
-    Serial.print(hour);
-    Serial.print(":");
-    Serial.print(minute);
-    Serial.print(":");
+    Serial.println("RBU");
+    Serial.println(hour);
+    Serial.println(minute);
     Serial.println(second);
-    */
-  
+    
     int now = millis();
-
-    /*
-    Serial.print(now);
-    Serial.print(" - ");
-    Serial.print(ms);
-    Serial.println("");
-     */
 
     int duration = num_screens == 6 ? 10 : 20;
     int digits_changed = 0;
-   // unsigned char *character = characters[second];
 
     if (now - ms> 1000) {
         ms += 1000;
@@ -422,7 +360,7 @@ void loop() {
         }
         if (m2 != M_digit_2 || first){
             // d7
-            colons = num_screens == 6;
+            //colons = num_screens == 6;
             do_it(3, characters[m2], characters[M_digit_2], duration);
             colons = false;
         }
@@ -432,7 +370,7 @@ void loop() {
         }
         if (h2 != H_digit_2 || first){
             //d3
-            colons = true;
+            //colons = true;
             do_it(1, characters[h2], characters[H_digit_2], duration);
             colons = false;
         }
@@ -455,15 +393,4 @@ void loop() {
             delay(1000);
         }
     }
-
-    //do_it(D0, D1, character, previous_character, duration);
-    //do_it(D0, D1, character, previous_character, duration);
-
-    /*
-       do_it(D14, D15, character, previous_character, duration);
-       do_it(D7, D8, character, previous_character, duration);
-       do_it(D3, D5, character, previous_character, duration);
-       do_it(D12, D11, character, previous_character, duration);
-       do_it(D4, D6, character, previous_character, duration);
-     */
 }
